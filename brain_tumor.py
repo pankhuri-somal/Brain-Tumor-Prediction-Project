@@ -89,8 +89,7 @@ def load_keras_model(path='brain_tumor_pred_model.keras'):
     return load_model(path)
 
 @st.cache_data
-def load_dataset(path='Brain_Tumor_Prediction_Dataset.csv.gzip'):
-    return pd.read_csv(path, compression='gzip')
+def load_dataset(path='data/brain_tumor_prediction_dataset.csv.gzip'):
 
 # ============ LOAD FILES ============
 try:
