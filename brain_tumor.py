@@ -83,7 +83,6 @@ with open('scaler.pkl', 'rb') as f:
 
 model = load_model('brain_tumor_pred_model.keras')
 
-df = pd.read_csv('Brain_Tumor_Prediction_Dataset.csv.gz', compression='gzip')
 
 
 # ============ FEATURES ============
@@ -96,7 +95,8 @@ feature_columns = [
 ]
 
 # Load dataset for min/max numeric values (optional)
-df = pd.read_csv('Brain_Tumor_Prediction_Dataset.csv')
+df = pd.read_csv('Brain_Tumor_Prediction_Dataset.csv.gz', compression='gzip')
+
 
 st.sidebar.header('🩺 Enter Patient Details')
 st.sidebar.image('https://mdwestone.com/wp-content/uploads/2024/07/brain-tumor.jpg')
