@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import random
 import time
 from tensorflow.keras.models import load_model
 
@@ -73,33 +74,17 @@ st.image(
     use_container_width=True
 )
 
-# ============ CACHE LOADING FUNCTIONS ============
-@st.cache_resource
-def load_encoders(path='encoders.pkl'):
-    with open(path, 'rb') as f:
-        return pickle.load(f)
+# ============ LOAD MODEL AND OBJECTS ============
+with open('encoders.pkl', 'rb') as f:
+    encoders = pickle.load(f)
 
-@st.cache_resource
-def load_scaler(path='scaler.pkl'):
-    with open(path, 'rb') as f:
-        return pickle.load(f)
+with open('scaler.pkl', 'rb') as f:
+    scaler = pickle.load(f)
 
-@st.cache_resource
-def load_keras_model(path='brain_tumor_pred_model.keras'):
-    return load_model(path)
+model = load_model('brain_tumor_pred_model.keras')
 
-@st.cache_data
-def load_dataset(path='data/brain_tumor_prediction_dataset.csv.gzip'):
+df = pd.read_csv('data/Brain_Tumor_Prediction_Dataset.csv.gz', compression='gzip')
 
-# ============ LOAD FILES ============
-try:
-    encoders = load_encoders()
-    scaler = load_scaler()
-    model = load_keras_model()
-    df = load_dataset()
-except FileNotFoundError as e:
-    st.error(f"Required file not found: {e.filename}. Please upload it or check file paths.")
-    st.stop()
 
 # ============ FEATURES ============
 feature_columns = [
@@ -109,6 +94,9 @@ feature_columns = [
     'Treatment_Received', 'Survival_Rate(%)', 'Tumor_Growth_Rate',
     'Family_History', 'Symptom_Severity', 'High_BP', 'Low_BP'
 ]
+
+# Load dataset for min/max numeric values (optional)
+df = pd.read_csv('Brain_Tumor_Prediction_Dataset.csv')
 
 st.sidebar.header('🩺 Enter Patient Details')
 st.sidebar.image('https://mdwestone.com/wp-content/uploads/2024/07/brain-tumor.jpg')
@@ -129,12 +117,14 @@ user_inputs = []
 
 for feature in feature_columns:
     if feature in encoders:
+        # Categorical feature - use selectbox and label encoder
         options = encoders[feature].classes_.tolist()
         selected = st.sidebar.selectbox(f'{feature}', options)
         encoded = encoders[feature].transform([selected])[0]
         user_inputs.append(encoded)
 
     elif feature == 'High_BP':
+        # Get example high BP from dataset or use default
         sample_bp = df['Blood_Pressure'].dropna().iloc[0] if 'Blood_Pressure' in df else '120/80'
         high_bp, _ = fraction_to_float(sample_bp)
         high_bp = int(high_bp) if not np.isnan(high_bp) else 120
@@ -142,6 +132,7 @@ for feature in feature_columns:
         user_inputs.append(high_val)
 
     elif feature == 'Low_BP':
+        # Get example low BP from dataset or use default
         sample_bp = df['Blood_Pressure'].dropna().iloc[0] if 'Blood_Pressure' in df else '120/80'
         _, low_bp = fraction_to_float(sample_bp)
         low_bp = int(low_bp) if not np.isnan(low_bp) else 80
@@ -149,11 +140,8 @@ for feature in feature_columns:
         user_inputs.append(low_val)
 
     else:
-        numeric_col = pd.to_numeric(
-            df[feature].apply(
-                lambda x: fraction_to_float(x)[0] if isinstance(x, str) and '/' in x else x
-            ), errors='coerce'
-        ).dropna()
+        # Numeric features - use slider based on dataset min/max or defaults
+        numeric_col = pd.to_numeric(df[feature].apply(lambda x: fraction_to_float(x)[0] if isinstance(x, str) and '/' in x else x), errors='coerce').dropna()
         min_val = int(numeric_col.min()) if not numeric_col.empty else 0
         max_val = int(numeric_col.max()) if not numeric_col.empty else 10
         if min_val == max_val:
@@ -163,6 +151,8 @@ for feature in feature_columns:
         user_inputs.append(selected)
 
 input_array = np.array([user_inputs])
+
+# Scale input
 scaled_input = scaler.transform(input_array)
 
 # ============ PREDICTION ============
