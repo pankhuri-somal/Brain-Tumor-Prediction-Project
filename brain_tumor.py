@@ -30,26 +30,30 @@ st.markdown("""
         text-align: justify;
         text-shadow: 1px 1px 3px black;
     }
+
     [data-testid="stSidebar"] {
         background: rgba(0, 0, 0, 0.7);
         backdrop-filter: blur(8px);
         color: white;
     }
+
+    /* BLACK BUTTONS */
     .stButton>button {
-        background-color: #0077b6;
-        color: white;
+        background-color: #000000 !important;
+        color: white !important;
         border-radius: 10px;
         border: none;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.7);
         transition: all 0.3s ease;
         font-size: 16px;
         padding: 8px 16px;
     }
     .stButton>button:hover {
-        background-color: #00b4d8;
-        color: black;
-        transform: scale(1.05);
+        background-color: #333333 !important;
+        color: white !important;
+        transform: scale(1.07);
     }
+
     .result-box {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 15px;
@@ -106,7 +110,6 @@ uploaded_image = st.sidebar.file_uploader("Upload MRI Scan", type=["jpg", "jpeg"
 
 
 def fraction_to_float(value):
-    """Convert fraction strings like '120/80' to tuple of floats (120.0, 80.0)"""
     if isinstance(value, str) and '/' in value:
         try:
             num, denom = value.split('/')
@@ -169,24 +172,19 @@ if st.sidebar.button('🔍 Predict Brain Tumor'):
     with st.spinner('🧬 Analyzing MRI and Patient Data...'):
         time.sleep(2)
 
-        
         prediction_tabular = model.predict(scaled_input)[0][0]
 
-       
         if uploaded_image is not None:
             try:
-                image_model = load_model("mri_cnn_model.h5")  # Optional CNN model
+                image_model = load_model("mri_cnn_model.h5")
                 mri_input = preprocess_mri_image(uploaded_image)
                 prediction_image = image_model.predict(mri_input)[0][0]
-                
                 final_prediction = (prediction_tabular + prediction_image) / 2
-
             except:
-                final_prediction = prediction_tabular  # If CNN not present
+                final_prediction = prediction_tabular
         else:
             final_prediction = prediction_tabular
 
-       
         st.markdown("<div class='result-box'>", unsafe_allow_html=True)
         if final_prediction < 0.5:
             st.success(f'✅ No Brain Tumor Detected (Confidence: {(1 - final_prediction) * 100:.2f}%)')
