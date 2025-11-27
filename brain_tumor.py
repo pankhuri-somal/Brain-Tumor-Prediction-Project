@@ -229,10 +229,10 @@ if st.sidebar.button('🔍 Predict Brain Tumor'):
         st.markdown("<div class='result-box'>", unsafe_allow_html=True)
 
         if final_prediction < 0.5:
-            st.success(f'✅ No Brain Tumor Detected  
+            st.success(f' No Brain Tumor Detected  
                         Confidence: {(1 - final_prediction) * 100:.2f}%')
         else:
-            st.error(f'⚠️ Brain Tumor Detected  
+            st.error(f' Brain Tumor Detected  
                       Confidence: {final_prediction * 100:.2f}%')
 
         st.markdown("</div>", unsafe_allow_html=True)
