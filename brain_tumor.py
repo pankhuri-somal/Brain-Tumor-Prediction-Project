@@ -5,11 +5,12 @@ import pickle
 import random
 import time
 from tensorflow.keras.models import load_model
+from PIL import Image
 
-# ============ PAGE CONFIG ============
+
 st.set_page_config(page_title="Brain Tumor Prediction", layout="centered")
 
-# ============ CUSTOM CSS ============
+
 st.markdown("""
     <style>
     .stApp {
@@ -60,7 +61,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ============ HEADER ============
+
 st.header('🧠 Brain Tumor Prediction Using Machine Learning')
 
 st.markdown('''
@@ -74,7 +75,7 @@ st.image(
     use_container_width=True
 )
 
-# ============ LOAD MODEL AND OBJECTS ============
+
 with open('encoders.pkl', 'rb') as f:
     encoders = pickle.load(f)
 
@@ -84,8 +85,6 @@ with open('scaler.pkl', 'rb') as f:
 model = load_model('brain_tumor_pred_model.keras')
 
 
-
-# ============ FEATURES ============
 feature_columns = [
     'Age', 'Gender', 'Country', 'Tumor_Size', 'Tumor_Location', 'MRI_Findings',
     'Genetic_Risk', 'Smoking_History', 'Alcohol_Consumption', 'Radiation_Exposure',
@@ -94,14 +93,18 @@ feature_columns = [
     'Family_History', 'Symptom_Severity', 'High_BP', 'Low_BP'
 ]
 
-# Load dataset for min/max numeric values (optional)
+
 df = pd.read_csv('Brain_Tumor_Prediction_Dataset.csv.gz', compression='gzip')
 
 
 st.sidebar.header('🩺 Enter Patient Details')
 st.sidebar.image('https://mdwestone.com/wp-content/uploads/2024/07/brain-tumor.jpg')
 
-# ============ HELPER FUNCTION ============
+
+st.sidebar.header("🧲 Upload MRI Image (Optional)")
+uploaded_image = st.sidebar.file_uploader("Upload MRI Scan", type=["jpg", "jpeg", "png"])
+
+
 def fraction_to_float(value):
     """Convert fraction strings like '120/80' to tuple of floats (120.0, 80.0)"""
     if isinstance(value, str) and '/' in value:
@@ -112,19 +115,24 @@ def fraction_to_float(value):
             return np.nan, np.nan
     return np.nan, np.nan
 
-# ============ USER INPUTS ============
+def preprocess_mri_image(image, target_size=(128,128)):
+    img = Image.open(image).convert("RGB")
+    img = img.resize(target_size)
+    img_array = np.array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    return img_array
+
+
 user_inputs = []
 
 for feature in feature_columns:
     if feature in encoders:
-        # Categorical feature - use selectbox and label encoder
         options = encoders[feature].classes_.tolist()
         selected = st.sidebar.selectbox(f'{feature}', options)
         encoded = encoders[feature].transform([selected])[0]
         user_inputs.append(encoded)
 
     elif feature == 'High_BP':
-        # Get example high BP from dataset or use default
         sample_bp = df['Blood_Pressure'].dropna().iloc[0] if 'Blood_Pressure' in df else '120/80'
         high_bp, _ = fraction_to_float(sample_bp)
         high_bp = int(high_bp) if not np.isnan(high_bp) else 120
@@ -132,7 +140,6 @@ for feature in feature_columns:
         user_inputs.append(high_val)
 
     elif feature == 'Low_BP':
-        # Get example low BP from dataset or use default
         sample_bp = df['Blood_Pressure'].dropna().iloc[0] if 'Blood_Pressure' in df else '120/80'
         _, low_bp = fraction_to_float(sample_bp)
         low_bp = int(low_bp) if not np.isnan(low_bp) else 80
@@ -140,7 +147,6 @@ for feature in feature_columns:
         user_inputs.append(low_val)
 
     else:
-        # Numeric features - use slider based on dataset min/max or defaults
         numeric_col = pd.to_numeric(df[feature].apply(lambda x: fraction_to_float(x)[0] if isinstance(x, str) and '/' in x else x), errors='coerce').dropna()
         min_val = int(numeric_col.min()) if not numeric_col.empty else 0
         max_val = int(numeric_col.max()) if not numeric_col.empty else 10
@@ -151,18 +157,39 @@ for feature in feature_columns:
         user_inputs.append(selected)
 
 input_array = np.array([user_inputs])
-
-# Scale input
 scaled_input = scaler.transform(input_array)
 
-# ============ PREDICTION ============
+
+if uploaded_image is not None:
+    st.subheader("📌 Uploaded MRI Image")
+    st.image(uploaded_image, caption="MRI Scan", use_container_width=True)
+
+
 if st.sidebar.button('🔍 Predict Brain Tumor'):
     with st.spinner('🧬 Analyzing MRI and Patient Data...'):
         time.sleep(2)
-        prediction = model.predict(scaled_input)[0][0]
-        st.markdown("<div class='result-box'>", unsafe_allow_html=True)
-        if prediction < 0.5:
-            st.success(f'✅ No Brain Tumor Detected (Confidence: {(1 - prediction) * 100:.2f}%)')
+
+        
+        prediction_tabular = model.predict(scaled_input)[0][0]
+
+       
+        if uploaded_image is not None:
+            try:
+                image_model = load_model("mri_cnn_model.h5")  # Optional CNN model
+                mri_input = preprocess_mri_image(uploaded_image)
+                prediction_image = image_model.predict(mri_input)[0][0]
+                
+                final_prediction = (prediction_tabular + prediction_image) / 2
+
+            except:
+                final_prediction = prediction_tabular  # If CNN not present
         else:
-            st.error(f'⚠️ Brain Tumor Detected (Confidence: {prediction * 100:.2f}%)')
+            final_prediction = prediction_tabular
+
+       
+        st.markdown("<div class='result-box'>", unsafe_allow_html=True)
+        if final_prediction < 0.5:
+            st.success(f'✅ No Brain Tumor Detected (Confidence: {(1 - final_prediction) * 100:.2f}%)')
+        else:
+            st.error(f'⚠️ Brain Tumor Detected (Confidence: {final_prediction * 100:.2f}%)')
         st.markdown("</div>", unsafe_allow_html=True)
